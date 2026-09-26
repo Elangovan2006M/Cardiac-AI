@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Cardiac Monitor • ESP32-S3 TinyML Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="app-container">
+
+    <!-- Header & Serial Port Toolbar -->
+    <header class="top-navbar">
+      <div class="brand-section">
+        <div class="pulse-icon-wrapper">
+          <svg class="heart-pulse-svg" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+            <path class="ecg-line" d="M3.5 12h3l2-4 3 8 2-6 2 3h5" stroke="var(--cyan-glow)" stroke-width="1.8"></path>
+          </svg>
+        </div>
+        <div class="brand-titles">
+          <h1>CARDIAC<span class="brand-accent">AI</span></h1>
+          <span class="brand-subtitle">ESP32-S3 TinyML Stethoscope</span>
+        </div>
+      </div>
+
+      <!-- Serial Connection Controls -->
+      <div class="serial-controls-panel">
+        <div class="control-group">
+          <label for="port-select">SERIAL PORT</label>
+          <div class="select-wrapper">
+            <select id="port-select" class="custom-select">
+              <option value="">Scanning ports...</option>
+            </select>
+            <button id="btn-refresh-ports" class="btn-icon" title="Rescan Serial Ports">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <label for="baud-select">BAUD RATE</label>
+          <select id="baud-select" class="custom-select">
+            <option value="115200" selected>115200</option>
+            <option value="921600">921600</option>
+            <option value="460800">460800</option>
+            <option value="230400">230400</option>
+            <option value="9600">9600</option>
+          </select>
+        </div>
+
+        <button id="btn-connect" class="btn-primary btn-connect">
+          <span class="btn-icon-dot"></span>
+          <span id="btn-connect-text">CONNECT</span>
+        </button>
+
+        <div id="connection-badge" class="status-pill pill-disconnected">
+          <span class="status-indicator-dot"></span>
+          <span id="connection-status-text">DISCONNECTED</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Dashboard Grid -->
+    <main class="dashboard-grid">
+
+      <!-- Distributed Edge-to-Host Pipeline & Latency Control Center -->
+      <section class="card pipeline-latency-card">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-icon cyan-icon">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+            </div>
+            <div>
+              <h2>Distributed Edge-to-Host Pipeline & Latency Enforcer</h2>
+              <span class="card-subtitle">I2S Mic Record &rarr; Stream over Serial &rarr; PC DSP & PyTorch AI Engine &rarr; Return to ESP32 TFT Display</span>
+            </div>
+          </div>
+          <div class="latency-ceiling-pill">
+            <span class="ceiling-label">MAX DELAY LIMIT:</span>
+            <span class="ceiling-value">3.00 SECONDS</span>
+          </div>
+        </div>
+
+        <div class="pipeline-body">
+          <!-- Real-Time Flow Nodes Diagram -->
+          <div class="pipeline-flow-diagram">
+            <div class="pipeline-node active" id="node-esp-mic">
+              <div class="node-icon">&#127908;</div>
+              <div class="node-info">
+                <span class="node-title">1. ESP32-S3 Mic</span>
+                <span class="node-detail">16kHz I2S DMA &rarr; 4kHz PCM</span>
+              </div>
+              <span class="node-badge" id="badge-mic-rate">STREAMING</span>
+            </div>
+
+            <div class="flow-arrow active" id="arrow-1">
+              <div class="flow-line"></div>
+              <span class="flow-label" id="val-stream-speed">UART 460.8k</span>
+            </div>
+
+            <div class="pipeline-node active" id="node-pc-engine">
+              <div class="node-icon">&#9881;</div>
+              <div class="node-info">
+                <span class="node-title">2. Host PC Engine</span>
+                <span class="node-detail">20-400Hz DSP + PyTorch Conv-AE</span>
+              </div>
+              <span class="node-badge" id="val-pc-proc-badge">&lt; 20 ms</span>
+            </div>
+
+            <div class="flow-arrow active" id="arrow-2">
+              <div class="flow-line"></div>
+              <span class="flow-label">JSON Telemetry</span>
+            </div>
+
+            <div class="pipeline-node active" id="node-tft-display">
+              <div class="node-icon">&#128250;</div>
+              <div class="node-info">
+                <span class="node-title">3. ESP32 TFT Screen</span>
+                <span class="node-detail">ILI9225 SPI Dashboard</span>
+              </div>
+              <span class="node-badge badge-synced" id="badge-tft-sync">DISPLAY LIVE</span>
+            </div>
+          </div>
+
+          <!-- Real-Time Latency Meter Grid -->
+          <div class="latency-meter-grid">
+            <div class="latency-stat-box">
+              <span class="lat-label">MEASURED ROUND-TRIP DELAY (LOOP LATENCY)</span>
+              <div class="lat-hero">
+                <span id="val-loop-latency" class="lat-number">0.65</span>
+                <span class="lat-unit">s</span>
+                <span id="badge-latency-status" class="badge-status-pass">PASS (&lt; 3.0s)</span>
+              </div>
+              <!-- Visual Meter Bar -->
+              <div class="latency-progress-track">
+                <div id="latency-progress-fill" class="latency-progress-fill" style="width: 21.6%;"></div>
+                <div class="latency-target-marker" title="3.0s Maximum Ceiling"></div>
+              </div>
+              <div class="latency-markers-label">
+                <span>0.0s</span>
+                <span>1.5s</span>
+                <span class="marker-max">3.0s MAX CEILING</span>
+              </div>
+            </div>
+
+            <div class="timing-breakdown-box">
+              <div class="timing-row">
+                <span class="timing-label">Audio Chunk Buffer:</span>
+                <span class="timing-value" id="val-audio-buffer-time">~500 ms (0.50s)</span>
+              </div>
+              <div class="timing-row">
+                <span class="timing-label">Serial Transmission:</span>
+                <span class="timing-value" id="val-tx-time">~87 ms (460.8k baud)</span>
+              </div>
+              <div class="timing-row">
+                <span class="timing-label">PC DSP + PyTorch AI Inference:</span>
+                <span class="timing-value text-cyan" id="val-pc-time">14.2 ms</span>
+              </div>
+              <div class="timing-row">
+                <span class="timing-label">ESP32 TFT Screen Loopback:</span>
+                <span class="timing-value text-green" id="val-tft-synced">CONFIRMED (PACKET ACK)</span>
+              </div>
+              <div class="timing-row">
+                <span class="timing-label">Total Synced Frames:</span>
+                <span class="timing-value" id="val-total-packets">0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Interactive Beat Control & Simulation Panel -->
+      <section class="card beat-control-card">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-icon green-icon">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            </div>
+            <div>
+              <h2>Interactive Beat Control & Cardiac Pathology Simulation</h2>
+              <span class="card-subtitle">Real-time signal synthesis connected to 1500-sample trained PyTorch Conv-AE AI Model</span>
+            </div>
+          </div>
+          <button id="btn-retrain-ai" class="btn-secondary btn-sm" title="Retrain AI Model on 1500-Sample Dataset">
+            ⚡ RETRAIN AI MODEL (1500 SAMPLES)
+          </button>
+        </div>
+
+        <div class="beat-controls-body">
+          <div class="control-row">
+            <span class="control-label">CARDIAC PATHOLOGY SELECTOR:</span>
+            <div class="chip-group">
+              <button class="pathology-chip active" data-pathology="NORMAL">NORMAL SINUS</button>
+              <button class="pathology-chip" data-pathology="SYSTOLIC_MURMUR">SYSTOLIC MURMUR (AS)</button>
+              <button class="pathology-chip" data-pathology="DIASTOLIC_MURMUR">DIASTOLIC MURMUR (MS)</button>
+              <button class="pathology-chip" data-pathology="GALLOP_S3_S4">S3 / S4 GALLOP</button>
+            </div>
+          </div>
+
+          <div class="sliders-row">
+            <div class="slider-control">
+              <div class="slider-header">
+                <label for="slider-bpm">HEART RATE (BPM):</label>
+                <span id="bpm-slider-val" class="slider-value-badge">72 BPM</span>
+              </div>
+              <input type="range" id="slider-bpm" min="40" max="180" value="72" class="custom-range-slider">
+            </div>
+
+            <div class="slider-control">
+              <div class="slider-header">
+                <label for="slider-noise">STETHOSCOPE CHEST NOISE:</label>
+                <span id="noise-slider-val" class="slider-value-badge">5%</span>
+              </div>
+              <input type="range" id="slider-noise" min="0" max="100" value="5" class="custom-range-slider">
+            </div>
+
+            <button id="btn-trigger-anomaly" class="btn-anomaly-trigger">
+              🚨 INJECT PATHOLOGICAL SPIKE
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- PCG Live Oscilloscope & 32x32 Log-Mel Spectrogram Card -->
+      <section class="card oscilloscope-card">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-icon cyan-icon">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+            </div>
+            <div>
+              <h2>Live Phonocardiogram (PCG) Oscilloscope & 32x32 Spectrogram</h2>
+              <span class="card-subtitle">16 kHz Digital MEMS &rarr; 4kHz Decimated &rarr; Biquad Bandpass 20–400 Hz &rarr; Log-Mel Matrix</span>
+            </div>
+          </div>
+          
+          <div class="scope-controls">
+            <div class="scope-control-item">
+              <span>GAIN:</span>
+              <button class="btn-chip active" data-gain="1">1x</button>
+              <button class="btn-chip" data-gain="2">2x</button>
+              <button class="btn-chip" data-gain="4">4x</button>
+            </div>
+            <button id="btn-freeze-scope" class="btn-secondary btn-sm">
+              <span id="freeze-text">FREEZE</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="canvas-container-dual">
+          <div class="scope-pane">
+            <canvas id="pcg-canvas"></canvas>
+            <div class="scope-overlay-metrics">
+              <div class="overlay-item">
+                <span class="overlay-label">PEAK-TO-PEAK</span>
+                <span id="val-vpp" class="overlay-value">0.84 V</span>
+              </div>
+              <div class="overlay-item">
+                <span class="overlay-label">HEART SOUND PHASE</span>
+                <span id="val-phase" class="overlay-value phase-s1">S1 (LUB)</span>
+              </div>
+            </div>
+          </div>
+          <div class="spec-pane">
+            <div class="spec-header">
+              <span>32&times;32 LOG-MEL SPECTROGRAM</span>
+              <span class="spec-sub">PC DSP Feature</span>
+            </div>
+            <canvas id="spec-canvas" width="160" height="160"></canvas>
+            <div class="spec-footer">
+              <span>20 Hz</span>
+              <span>MEL FREQUENCY BINS</span>
+              <span>400 Hz</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Heart Sound Phase Indicator Track -->
+        <div class="phase-bar-track">
+          <div class="phase-segment active-s1" id="phase-s1">S1 (Systole Start)</div>
+          <div class="phase-segment" id="phase-sys">Systolic Flow</div>
+          <div class="phase-segment" id="phase-s2">S2 (Diastole Start)</div>
+          <div class="phase-segment" id="phase-dia">Diastolic Rest</div>
+        </div>
+      </section>
+
+
+      <!-- Key Metrics & Gauges Grid -->
+      <section class="metrics-row">
+
+        <!-- Heart Rate (BPM) Card -->
+        <div class="card metric-card">
+          <div class="card-header">
+            <span class="metric-label">HEART RATE</span>
+            <div class="live-pulse-badge">
+              <span class="pulse-ring"></span>
+              LIVE
+            </div>
+          </div>
+          <div class="metric-body">
+            <div class="metric-primary-display">
+              <span id="metric-bpm" class="huge-number">72</span>
+              <span class="metric-unit">BPM</span>
+            </div>
+            <div class="bpm-rhythm-status">
+              <span id="bpm-tag" class="badge-rhythm rhythm-normal">NORMAL SINUS</span>
+            </div>
+          </div>
+          <div class="metric-footer">
+            <div class="sub-stat">
+              <span class="sub-stat-label">Min / Max:</span>
+              <span class="sub-stat-value" id="bpm-minmax">68 / 78</span>
+            </div>
+            <div class="sub-stat">
+              <span class="sub-stat-label">R-R Var:</span>
+              <span class="sub-stat-value" id="bpm-rr">28 ms</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- TinyML Conv-AE Anomaly Risk Meter -->
+        <div class="card metric-card">
+          <div class="card-header">
+            <span class="metric-label">TINYML ANOMALY RISK</span>
+            <span class="chip-badge">CONV-AE INT8</span>
+          </div>
+          <div class="metric-body radial-body">
+            <div class="radial-gauge-container">
+              <svg class="radial-svg" viewBox="0 0 140 140">
+                <circle class="gauge-bg" cx="70" cy="70" r="54"></circle>
+                <circle id="anomaly-gauge-circle" class="gauge-bar" cx="70" cy="70" r="54"></circle>
+              </svg>
+              <div class="gauge-content">
+                <span id="metric-anomaly-pct" class="gauge-number">14.5%</span>
+                <span class="gauge-sublabel">RISK SCORE</span>
+              </div>
+            </div>
+            <div class="anomaly-badge-container">
+              <span id="anomaly-status-badge" class="badge-anomaly-state state-normal">NORMAL</span>
+            </div>
+          </div>
+          <div class="metric-footer">
+            <div class="sub-stat">
+              <span class="sub-stat-label">EVT Limit:</span>
+              <span class="sub-stat-value">50.0%</span>
+            </div>
+            <div class="sub-stat">
+              <span class="sub-stat-label">Inference:</span>
+              <span class="sub-stat-value">12.4 ms</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Autoencoder Reconstruction MSE Card -->
+        <div class="card metric-card">
+          <div class="card-header">
+            <span class="metric-label">RECONSTRUCTION MSE</span>
+            <button id="btn-recalibrate" class="btn-chip btn-calibrate" title="Calibrate Baseline">CALIBRATE</button>
+          </div>
+          <div class="metric-body">
+            <div class="metric-primary-display">
+              <span id="metric-mse" class="huge-number-sm">0.0018</span>
+            </div>
+            <div class="mse-bar-wrapper">
+              <div class="mse-bar-header">
+                <span>Loss vs Threshold</span>
+                <span id="mse-pct-label">18%</span>
+              </div>
+              <div class="progress-track">
+                <div id="mse-progress-fill" class="progress-fill" style="width: 18%;"></div>
+              </div>
+            </div>
+          </div>
+          <div class="metric-footer">
+            <div class="sub-stat">
+              <span class="sub-stat-label">Baseline:</span>
+              <span class="sub-stat-value" id="val-baseline-status">CALIBRATED</span>
+            </div>
+            <div class="sub-stat">
+              <span class="sub-stat-label">Quant:</span>
+              <span class="sub-stat-value">INT8 (Esp-NN)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- System & Hardware Telemetry Card -->
+        <div class="card metric-card">
+          <div class="card-header">
+            <span class="metric-label">HARDWARE STATUS</span>
+            <span class="chip-badge chip-green">ESP32-S3</span>
+          </div>
+          <div class="system-stats-grid">
+            <div class="sys-item">
+              <span class="sys-icon">🔌</span>
+              <div>
+                <div class="sys-label">Connection</div>
+                <div class="sys-val" id="hw-ip">Direct USB/Serial</div>
+              </div>
+            </div>
+            <div class="sys-item">
+              <span class="sys-icon">⚡</span>
+              <div>
+                <div class="sys-label">CPU Clock</div>
+                <div class="sys-val">240 MHz (2 Cores)</div>
+              </div>
+            </div>
+            <div class="sys-item">
+              <span class="sys-icon">💾</span>
+              <div>
+                <div class="sys-label">Octal PSRAM</div>
+                <div class="sys-val">8 MB (N16R8)</div>
+              </div>
+            </div>
+            <div class="sys-item">
+              <span class="sys-icon">🔋</span>
+              <div>
+                <div class="sys-label">Battery</div>
+                <div class="sys-val" id="hw-battery">98% (4.12V)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- Bottom Row: Terminal Console & Session Recording -->
+      <section class="bottom-split-row">
+
+        <!-- Serial Debug Terminal -->
+        <div class="card terminal-card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <div class="card-icon amber-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+              </div>
+              <div>
+                <h2>Live Serial Console & ESP-IDF Logs</h2>
+                <span class="card-subtitle">Real-time serial stream from ESP32-S3 UART/USB</span>
+              </div>
+            </div>
+            <div class="terminal-actions">
+              <label class="toggle-control">
+                <input type="checkbox" id="autoscroll-chk" checked>
+                <span>Autoscroll</span>
+              </label>
+              <button id="btn-clear-logs" class="btn-secondary btn-sm">CLEAR</button>
+            </div>
+          </div>
+          
+          <div class="terminal-body" id="terminal-output">
+            <div class="terminal-line log-info">[00:00:00] Cardiac Monitoring Flask Dashboard Initialized.</div>
+            <div class="terminal-line log-info">[00:00:00] Select a COM port and click CONNECT to stream live data.</div>
+          </div>
+
+          <div class="terminal-cmd-bar">
+            <input type="text" id="cmd-input" placeholder="Send serial command (e.g. CALIBRATE, RESET, PING)..." autocomplete="off">
+            <button id="btn-send-cmd" class="btn-secondary">SEND</button>
+          </div>
+        </div>
+
+        <!-- Session Recorder & Export Panel -->
+        <div class="card session-card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <div class="card-icon green-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
+              </div>
+              <div>
+                <h2>Telemetry Session Recorder</h2>
+                <span class="card-subtitle">Record and export acoustic telemetry to CSV</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="session-body">
+            <div class="recording-timer-display">
+              <span class="rec-dot" id="rec-indicator"></span>
+              <span class="timer-digits" id="rec-timer">00:00</span>
+            </div>
+
+            <div class="session-stats">
+              <div class="session-stat-item">
+                <span class="session-stat-title">FRAMES CAPTURED</span>
+                <span class="session-stat-value" id="rec-sample-count">0</span>
+              </div>
+              <div class="session-stat-item">
+                <span class="session-stat-title">STATUS</span>
+                <span class="session-stat-value" id="rec-status-text">STANDBY</span>
+              </div>
+            </div>
+
+            <div class="session-buttons">
+              <button id="btn-record-toggle" class="btn-primary btn-record">
+                <span>START RECORDING</span>
+              </button>
+              <a id="btn-export-csv" href="/api/record/export" class="btn-secondary btn-export disabled">
+                <span>EXPORT CSV</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <span>Smart Cardiac Stethoscope • Edge AI Unsupervised Phonocardiogram Analysis</span>
+      <span>ESP32-S3 Dual-Core Xtensa LX7 @ 240MHz • ESP-IDF v6.0</span>
+    </footer>
+
+  </div>
+
+  <script src="/static/js/dashboard.js"></script>
+</body>
+</html>
